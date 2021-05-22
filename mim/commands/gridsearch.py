@@ -294,6 +294,23 @@ def gridsearch(
         exp_names.append(config_tmpl + name_suffix)
         config_path = osp.join(work_dir, config_name)
 
+        # This exp has been launched before
+        if osp.exists(config_path):
+            total_epochs = cur_cfg['total_epochs']
+            # The experiment has finished
+            if osp.exists(osp.join(work_dir, f'epoch_{total_epochs}.pth')):
+                continue
+
+            ckpts = os.listdir(work_dir)
+            ckpts = [x for x in ckpts if 'epoch_' in x and '.pth' in x]
+
+            if len(ckpts):
+                # resume from the latest ckpt
+                max_epoch = max(
+                    [int(x.split('.')[0].split('_')[1]) for x in ckpts])
+                cur_cfg['resume_from'] = osp.join(work_dir,
+                                                  f'epoch_{max_epoch}.pth')
+
         with open(config_path, 'w') as fout:
             fout.write(cur_cfg.pretty_text)
 
@@ -324,7 +341,10 @@ def gridsearch(
 
         cmds.append(cmd)
 
-    time.sleep(5)
+    time.sleep(10)
+    for cmd in cmds:
+        click.echo(' '.join(cmd))
+
     succeed_list, fail_list = [], []
     if launcher in ['none', 'pytorch']:
         for cmd, exp_name in zip(cmds, exp_names):
