@@ -34,7 +34,7 @@ from mim.utils import (
 @click.option(
     '--launcher',
     type=click.Choice(['none', 'pytorch', 'slurm'], case_sensitive=False),
-    default='none',
+    default='slurm',
     help='Job launcher')
 @click.option(
     '--port',
@@ -42,10 +42,11 @@ from mim.utils import (
     default=29500,
     help=('The port used for inter-process communication '
           '(only applicable to slurm / pytorch launchers)'))
-@click.option('--gpus', type=int, default=1, help='Number of gpus to use')
+@click.option('--gpus', type=int, default=8, help='Number of gpus to use')
 @click.option(
     '--gpus-per-node',
     type=int,
+    default=8,
     help=('Number of gpus per node to use '
           '(only applicable to launcher == "slurm")'))
 @click.option(
