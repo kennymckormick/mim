@@ -84,7 +84,6 @@ def cli(package: str,
         other_args: tuple = ()) -> None:
     """Perform Hyper-parameter search.
 
-    Tmp Comment
     Example:
 
     \b
