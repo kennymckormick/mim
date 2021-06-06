@@ -44,7 +44,7 @@ from mim.utils import (
     help=('The port used for inter-process communication '
           '(only applicable to slurm / pytorch launchers)'))
 @click.option(
-    '-G', '--gpus', type=int, default=1, help='Number of gpus to use')
+    '-G', '--gpus', type=int, default=8, help='Number of gpus to use')
 @click.option(
     '-g',
     '--gpus-per-node',

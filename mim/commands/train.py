@@ -37,7 +37,7 @@ from mim.utils import (
           'slurm / pytorch launchers). If set to None, will randomly choose '
           'a port between 20000 and 30000. '))
 @click.option(
-    '-G', '--gpus', type=int, default=1, help='Number of gpus to use')
+    '-G', '--gpus', type=int, default=8, help='Number of gpus to use')
 @click.option(
     '-g',
     '--gpus-per-node',
