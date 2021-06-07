@@ -333,6 +333,8 @@ def gridsearch(
 
         with open(config_path, 'w') as fout:
             fout.write(cur_cfg.pretty_text)
+            fout.flush()
+            time.sleep(1)
 
         other_args_dict_ = cp.deepcopy(other_args_dict)
         other_args_dict_['work-dir'] = [work_dir]
