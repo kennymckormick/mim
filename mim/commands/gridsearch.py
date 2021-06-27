@@ -68,7 +68,10 @@ from mim.utils import (
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
 @click.option(
-    '--search-args', type=str, help='Arguments for hyper parameters search')
+    '-S',
+    '--search-args',
+    type=str,
+    help='Arguments for hyper parameters search')
 @click.argument('other_args', nargs=-1, type=click.UNPROCESSED)
 def cli(package: str,
         config: str,
