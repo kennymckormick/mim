@@ -27,6 +27,7 @@ from mim.utils import (
 @click.option(
     '-C', '--checkpoint', type=str, default=None, help='checkpoint path')
 @click.option(
+    '-l',
     '--launcher',
     type=click.Choice(['none', 'pytorch', 'slurm'], case_sensitive=False),
     default='slurm',
@@ -64,6 +65,7 @@ from mim.utils import (
     help='The partition to use (only applicable to launcher == "slurm")')
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
+@click.option('-y', '--yes', is_flag=True, help='Don’t ask for confirmation.')
 @click.argument('other_args', nargs=-1, type=click.UNPROCESSED)
 def cli(package: str,
         config: str,
@@ -75,6 +77,7 @@ def cli(package: str,
         launcher: str = 'none',
         port: int = None,
         srun_args: Optional[str] = None,
+        yes: bool = False,
         other_args: tuple = ()) -> None:
     """Perform Testing.
 
@@ -112,6 +115,7 @@ def cli(package: str,
         launcher=launcher,
         port=port,
         srun_args=srun_args,
+        yes=yes,
         other_args=other_args)
 
     if is_success:
@@ -131,6 +135,7 @@ def test(
     launcher: str = 'none',
     port: int = None,
     srun_args: Optional[str] = None,
+    yes: bool = True,
     other_args: tuple = ()
 ) -> Tuple[bool, Union[str, Exception]]:
     """Test a model with given config.
@@ -156,6 +161,7 @@ def test(
             between 20000 and 30000.
         srun_args (str, optional): Other srun arguments that might be
             used, all arguments should be in a string. Defaults to None.
+        yes (bool): Don’t ask for confirmation. Default: True.
         other_args (tuple, optional): Other arguments, will be passed to the
             codebase's training script. Defaults to ().
     """
@@ -191,7 +197,7 @@ def test(
     if not is_installed(package):
         msg = (f'The codebase {package} is not installed, '
                'do you want to install it? ')
-        if click.confirm(msg):
+        if yes or click.confirm(msg):
             click.echo(f'Installing {package}')
             cmd = ['mim', 'install', package]
             ret = subprocess.check_call(cmd)
@@ -244,6 +250,11 @@ def test(
         cmd += common_args
     elif launcher == 'slurm':
         parsed_srun_args = srun_args.split() if srun_args else []
+        has_job_name = any([('--job-name' in x) or ('-J' in x)
+                            for x in parsed_srun_args])
+        if not has_job_name:
+            job_name = osp.splitext(osp.basename(config))[0]
+            parsed_srun_args.append(f'--job-name={job_name}_test')
         cmd = [
             'srun', '-p', f'{partition}', f'--gres=gpu:{gpus_per_node}',
             f'--ntasks={gpus}', f'--ntasks-per-node={gpus_per_node}',

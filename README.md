@@ -1,69 +1,41 @@
 # MIM: MIM Installs OpenMMLab Packages
 
-MIM provides a unified API for launching and installing OpenMMLab projects and their extensions, and managing the OpenMMLab model zoo.
+MIM provides a unified interface for launching and installing OpenMMLab projects and their extensions, and managing the OpenMMLab model zoo.
+
+## Major Features
+
+- **Package Management**
+
+  You can use MIM to manage OpenMMLab codebases, install or uninstall them conveniently.
+
+- **Model Management**
+
+  You can use MIM to manage OpenMMLab model zoo, e.g., download checkpoints by name, search checkpoints that meet specific criteria.
+
+- **Unified Entrypoint for Scripts**
+
+  You can execute any script provided by all OpenMMLab codebases with unified commands. Train, test and inference become easier than ever. Besides, you can use `gridsearch` command for vanilla hyper-parameter search.
+
+## License
+
+This project is released under the [Apache 2.0 license](LICENSE).
+
+## Changelog
+
+v0.1.1 was released in 13/6/2021.
+
+## Customization
+
+You can use `.mimrc` for customization. Now we support customize default values of each sub-command. Please refer to [customization.md](docs/customization.md) for details.
+
+## Build custom projects with MIM
+
+We provide some examples of how to build custom projects based on OpenMMLAB codebases and MIM in [MIM-Example](https://github.com/open-mmlab/mim-example).
+Without worrying about copying codes and scripts from existing codebases, users can focus on developing new components and MIM helps integrate and run the new project.
 
 ## Installation
 
-1. Create a conda virtual environment and activate it.
-
-    ```bash
-    conda create -n open-mmlab python=3.7 -y
-    conda activate open-mmlab
-    ```
-
-2. Install PyTorch and torchvision following the [official instructions](https://pytorch.org/), e.g.,
-
-    ```bash
-    conda install pytorch torchvision -c pytorch
-    ```
-
-    Note: Make sure that your compilation CUDA version and runtime CUDA version match.
-    You can check the supported CUDA version for precompiled packages on the [PyTorch website](https://pytorch.org/).
-
-3. Install MIM
-
-    + from pypi
-
-        ```bash
-        pip install openmim
-        ```
-
-    + from source
-
-        ```bash
-        git clone https://github.com/open-mmlab/mim.git
-        cd mim
-        pip install -e .
-        # python setup.py develop or python setup.py install
-        ```
-
-4. Auto completion (Optional)
-
-    In order to activate shell completion, you need to inform your shell that completion is available for your script.
-
-    + For Bash, add this to ~/.bashrc:
-
-        ```bash
-        eval "$(_MIM_COMPLETE=source mim)"
-        ```
-
-    + For Zsh, add this to ~/.zshrc:
-
-        ```bash
-        eval "$(_MIM_COMPLETE=source_zsh mim)"
-        ```
-
-    + For Fish, add this to ~/.config/fish/completions/mim.fish:
-
-        ```bash
-        eval (env _MIM_COMPLETE=source_fish mim)
-        ```
-
-    Open a new shell to enable completion. Or run the eval command directly in your current shell to enable it temporarily.
-
-    The above eval command will invoke your application every time a shell is started. This may slow down shell startup time significantly.
-
-    Alternatively, you can activate the script. Please refer to [activation-script](https://click.palletsprojects.com/en/7.x/bashcomplete/#activation-script)
+Please refer to [installation.md](docs/installation.md) for installation.
 
 ## Command
 
@@ -72,7 +44,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416945.svg)](https://asciinema.org/a/416945)
 
-+ command
+- command
 
     ```bash
     # install latest version of mmcv-full
@@ -97,7 +69,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     mim install mmcls-project -f https://github.com/xxx/mmcls-project.git
     ```
 
-+ api
+- api
 
     ```python
     from mim import install
@@ -121,7 +93,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416948.svg)](https://asciinema.org/a/416948)
 
-+ command
+- command
 
     ```bash
     # uninstall mmcv
@@ -131,7 +103,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     > mim uninstall mmcls
     ```
 
-+ api
+- api
 
     ```python
     from mim import uninstall
@@ -150,14 +122,14 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416949.svg)](https://asciinema.org/a/416949)
 
-+ command
+- command
 
     ```bash
     > mim list
     > mim list --all
     ```
 
-+ api
+- api
 
     ```python
     from mim import list_package
@@ -173,7 +145,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416950.svg)](https://asciinema.org/a/416950)
 
-+ command
+- command
 
     ```bash
     > mim search mmcls
@@ -190,7 +162,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     > mim search mmcls --exclude-field weight paper
     ```
 
-+ api
+- api
 
     ```python
     from mim import get_model_info
@@ -213,14 +185,14 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416951.svg)](https://asciinema.org/a/416951)
 
-+ command
+- command
 
     ```bash
     > mim download mmcls --config resnet18_b16x8_cifar10
     > mim download mmcls --config resnet18_b16x8_cifar10 --dest .
     ```
 
-+ api
+- api
 
     ```python
     from mim import download
@@ -236,7 +208,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416953.svg)](https://asciinema.org/a/416953)
 
-+ command
+- command
 
     ```bash
     # Train models on a single server with CPU by setting `gpus` to 0 and
@@ -257,7 +229,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     > mim train mmcls -h
     ```
 
-+ api
+- api
 
     ```python
     from mim import train
@@ -280,7 +252,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416955.svg)](https://asciinema.org/a/416955)
 
-+ command
+- command
 
     ```bash
     # Test models on a single server with 1 GPU, report accuracy
@@ -303,7 +275,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     > mim test mmcls -h
     ```
 
-+ api
+- api
 
     ```python
     from mim import test
@@ -326,7 +298,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416956.svg)](https://asciinema.org/a/416956)
 
-+ command
+- command
 
     ```bash
     # Get the Flops of a model
@@ -349,7 +321,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     > mim run mmcls train -h
     ```
 
-+ api
+- api
 
     ``` python
     from mim import run
@@ -371,7 +343,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
 
 [![asciicast](https://asciinema.org/a/416958.svg)](https://asciinema.org/a/416958)
 
-+ command
+- command
 
     ```bash
     # Parameter search on a single server with CPU by setting `gpus` to 0 and
@@ -402,7 +374,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     # rate and weight_decay, max parallel jobs is 2
     > mim gridsearch mmcls resnet101_b16x8_cifar10.py --work-dir tmp --gpus 8 \
         --partition partition_name --gpus-per-node 8 --launcher slurm \
-        --max-workers 2 --search-args '--optimizer.lr 1e-2 1e-3 \
+        --max-jobs 2 --search-args '--optimizer.lr 1e-2 1e-3 \
         --optimizer.weight_decay 1e-3 1e-4'
     # Print the help message of sub-command search
     > mim gridsearch -h
@@ -411,7 +383,7 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     > mim gridsearch mmcls -h
     ```
 
-+ api
+- api
 
     ```python
     from mim import gridsearch
@@ -443,16 +415,6 @@ MIM provides a unified API for launching and installing OpenMMLab projects and t
     ```
 
 </details>
-
-
-## Build custom projects with MIM
-
-We provide some examples about how to build custom projects based on OpenMMLAB codebases and MIM in [MIM-Example](https://github.com/open-mmlab/mim-example). In [mmcls_custom_backbone](https://github.com/open-mmlab/mim-example/tree/master/mmcls_custom_backbone), we define a custom backbone and a classification config file that uses the backbone. To train this model, you can use the command:
-
-```python
-# The working directory is `mim-example/mmcls_custom_backbone`
-PYTHONPATH=$PWD:$PYTHONPATH mim train mmcls custom_net_config.py --work-dir tmp --gpus 1
-```
 
 
 ## Contributing

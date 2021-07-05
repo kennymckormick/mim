@@ -33,6 +33,7 @@ from mim.utils import (
 @click.argument('package', type=str)
 @click.argument('config', type=str)
 @click.option(
+    '-l',
     '--launcher',
     type=click.Choice(['none', 'pytorch', 'slurm'], case_sensitive=False),
     default='slurm',
@@ -67,6 +68,7 @@ from mim.utils import (
     '-j', '--max-jobs', type=int, help='Max parallel number', default=1)
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
+@click.option('-y', '--yes', is_flag=True, help='Don’t ask for confirmation.')
 @click.option(
     '-S',
     '--search-args',
@@ -84,6 +86,7 @@ def cli(package: str,
         port: int = 29500,
         srun_args: Optional[str] = None,
         search_args: str = '',
+        yes: bool = False,
         other_args: tuple = ()) -> None:
     """Perform Hyper-parameter search.
 
@@ -139,6 +142,7 @@ def cli(package: str,
         port=port,
         srun_args=srun_args,
         search_args=search_args,
+        yes=yes,
         other_args=other_args)
 
     if is_success:
@@ -159,6 +163,7 @@ def gridsearch(
     port: int = 29500,
     srun_args: Optional[str] = None,
     search_args: str = '',
+    yes: bool = True,
     other_args: tuple = ()
 ) -> Tuple[bool, Union[str, Exception]]:
     """Hyper parameter search with given config.
@@ -184,6 +189,7 @@ def gridsearch(
             used, all arguments should be in a string. Defaults to None.
         search_args (str, optional): Arguments for hyper parameters search, all
             arguments should be in a string. Defaults to None.
+        yes (bool): Don’t ask for confirmation. Default: True.
         other_args (tuple, optional): Other arguments, will be passed to the
             codebase's training script. Defaults to ().
     """
@@ -204,7 +210,7 @@ def gridsearch(
     if not is_installed(package):
         msg = (f'The codebase {package} is not installed, '
                'do you want to install it? ')
-        if click.confirm(msg):
+        if yes or click.confirm(msg):
             click.echo(f'Installing {package}')
             cmd = ['mim', 'install', package]
             ret = subprocess.check_call(cmd)
@@ -261,7 +267,7 @@ def gridsearch(
     for arg in search_args_dict:
         try:
             arg_value = get_config(cfg, arg)
-            if arg_value and type(arg_value) is not str:
+            if arg_value and not isinstance(arg_value, str):
                 search_args_dict[arg] = [
                     eval(x) for x in search_args_dict[arg]
                 ]
@@ -363,6 +369,11 @@ def gridsearch(
             ] + common_args
         elif launcher == 'slurm':
             parsed_srun_args = srun_args.split() if srun_args else []
+            has_job_name = any([('--job-name' in x) or ('-J' in x)
+                                for x in parsed_srun_args])
+            if not has_job_name:
+                job_name = osp.splitext(osp.basename(config_path))[0]
+                parsed_srun_args.append(f'--job-name={job_name}_train')
             cmd = [
                 'srun', '-p', f'{partition}', f'--gres=gpu:{gpus_per_node}',
                 f'--ntasks={gpus}', f'--ntasks-per-node={gpus_per_node}',
