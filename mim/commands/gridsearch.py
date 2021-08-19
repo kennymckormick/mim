@@ -2,6 +2,7 @@ import copy as cp
 import itertools
 import os
 import os.path as osp
+import random as rd
 import subprocess
 import time
 from concurrent.futures import ProcessPoolExecutor as Executor
@@ -41,9 +42,10 @@ from mim.utils import (
 @click.option(
     '--port',
     type=int,
-    default=29500,
-    help=('The port used for inter-process communication '
-          '(only applicable to slurm / pytorch launchers)'))
+    default=None,
+    help=('The port used for inter-process communication (only applicable to '
+          'slurm / pytorch launchers). If set to None, will randomly choose '
+          'a port between 20000 and 30000. '))
 @click.option(
     '-G', '--gpus', type=int, default=8, help='Number of gpus to use')
 @click.option(
@@ -83,7 +85,7 @@ def cli(package: str,
         cpus_per_task: int = 2,
         max_jobs: int = 1,
         launcher: str = 'none',
-        port: int = 29500,
+        port: int = None,
         srun_args: Optional[str] = None,
         search_args: str = '',
         yes: bool = False,
@@ -160,7 +162,7 @@ def gridsearch(
     max_jobs: int = 1,
     partition: str = None,
     launcher: str = 'none',
-    port: int = 29500,
+    port: int = None,
     srun_args: Optional[str] = None,
     search_args: str = '',
     yes: bool = True,
@@ -183,8 +185,10 @@ def gridsearch(
             if launcher == 'slurm'. Default to 1.
         launcher (str, optional): The launcher used to launch jobs.
             Defaults to 'none'.
-        port (int, optional): The port used for inter-process communication
-            (only applicable to slurm / pytorch launchers). Default to 29500.
+        port (int | None, optional): The port used for inter-process
+            communication (only applicable to slurm / pytorch launchers).
+            Default to None. If set to None, will randomly choose a port
+            between 20000 and 30000.
         srun_args (str, optional): Other srun arguments that might be
             used, all arguments should be in a string. Defaults to None.
         search_args (str, optional): Arguments for hyper parameters search, all
@@ -362,6 +366,9 @@ def gridsearch(
                 cmd = ['python', train_script, config_path, '--device', 'cpu'
                        ] + common_args
         elif launcher == 'pytorch':
+            if port is None:
+                port = rd.randint(20000, 30000)
+
             cmd = [
                 'python', '-m', 'torch.distributed.launch',
                 f'--nproc_per_node={gpus}', f'--master_port={port}',
@@ -403,17 +410,25 @@ def gridsearch(
                 fail_list.append(exp_name)
 
     elif launcher == 'slurm':
+        if port is not None:
+            with Executor(max_workers=max_jobs) as executor:
+                for exp, ret in zip(exp_names,
+                                    executor.map(subprocess.check_call, cmds)):
+                    if ret == 0:
+                        click.echo(f'Exp {exp} finished successfully.')
+                        succeed_list.append(exp)
+                    else:
+                        echo_error(f'Exp {exp} not finished successfully.')
+                        fail_list.append(exp)
+        else:
+            for cmd in cmds:
+                cmd_str = ' '.join(cmd)
+                port = rd.randint(20000, 30000)
+                cmd_str = f'MASTER_PORT={port} ' + cmd_str + ' &'
+                os.system(cmd_str)
+                os.system('sleep 10')
 
-        with Executor(max_workers=max_jobs) as executor:
-
-            for exp, ret in zip(exp_names,
-                                executor.map(subprocess.check_call, cmds)):
-                if ret == 0:
-                    click.echo(f'Exp {exp} finished successfully.')
-                    succeed_list.append(exp)
-                else:
-                    echo_error(f'Exp {exp} not finished successfully.')
-                    fail_list.append(exp)
+            return True, 'MIM Random Port Slurm GSearch Finished. '
 
     if len(fail_list):
         msg = ('The following experiments in hyper parameter search '
