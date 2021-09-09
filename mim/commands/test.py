@@ -25,8 +25,6 @@ from mim.utils import (
 @click.argument('package', type=str, callback=param2lowercase)
 @click.argument('config', type=str)
 @click.option(
-    '-C', '--checkpoint', type=str, default=None, help='checkpoint path')
-@click.option(
     '-l',
     '--launcher',
     type=click.Choice(['none', 'pytorch', 'slurm'], case_sensitive=False),
@@ -69,7 +67,6 @@ from mim.utils import (
 @click.argument('other_args', nargs=-1, type=click.UNPROCESSED)
 def cli(package: str,
         config: str,
-        checkpoint: str,
         gpus: int,
         gpus_per_node: int,
         partition: str,
@@ -107,7 +104,6 @@ def cli(package: str,
     is_success, msg = test(
         package=package,
         config=config,
-        checkpoint=checkpoint,
         gpus=gpus,
         gpus_per_node=gpus_per_node,
         cpus_per_task=cpus_per_task,
@@ -127,7 +123,6 @@ def cli(package: str,
 def test(
     package: str,
     config: str,
-    checkpoint: str = None,
     gpus: int = None,
     gpus_per_node: int = None,
     cpus_per_task: int = 2,
@@ -144,7 +139,6 @@ def test(
         package (str): The codebase name.
         config (str): The config file path. If not exists, will search in the
             config files of the codebase.
-        checkpoint (str): The path to the checkpoint file. Default to None.
         gpus (int): Number of gpus used for testing
             (only applicable to launcher == "slurm"). Defaults to None.
         gpus_per_node (int, optional): Number of gpus per node to use
@@ -170,15 +164,6 @@ def test(
         msg = f"Can't determine a unique package given abbreviation {package}"
         raise ValueError(highlighted_error(msg))
     package = full_name
-
-    # `checkpoint` is a compulsory argument for all mm codebases except
-    # mmtracking, so that if the codebase is not mmtracking, user must specify
-    # the checkpoint.
-    # [TODO]: refactor the code logic and remove the hard coding
-    if checkpoint is None:
-        assert package == 'mmtrack', (
-            'You must specify the checkpoint path '
-            'unless you are testing mmtracking models')
 
     if port is None:
         port = rd.randint(20000, 30000)
@@ -235,19 +220,13 @@ def test(
     common_args = ['--launcher', launcher] + list(other_args)
 
     if launcher == 'none':
-        cmd = ['python', test_script, config]
-        if checkpoint:
-            cmd += [checkpoint]
-        cmd += common_args
+        cmd = ['python', test_script, config] + common_args
     elif launcher == 'pytorch':
         cmd = [
             'python', '-m', 'torch.distributed.launch',
             f'--nproc_per_node={gpus}', f'--master_port={port}', test_script,
             config
-        ]
-        if checkpoint:
-            cmd += [checkpoint]
-        cmd += common_args
+        ] + common_args
     elif launcher == 'slurm':
         parsed_srun_args = srun_args.split() if srun_args else []
         has_job_name = any([('--job-name' in x) or ('-J' in x)
@@ -262,8 +241,6 @@ def test(
         ]
         cmd += parsed_srun_args
         cmd += ['python', '-u', test_script, config]
-        if checkpoint:
-            cmd += [checkpoint]
         cmd += common_args
 
     cmd_text = ' '.join(cmd)
