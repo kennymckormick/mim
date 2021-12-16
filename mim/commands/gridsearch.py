@@ -36,7 +36,7 @@ from mim.utils import (
 @click.option(
     '-l',
     '--launcher',
-    type=click.Choice(['none', 'pytorch', 'slurm'], case_sensitive=False),
+    type=click.Choice(['pytorch', 'slurm'], case_sensitive=False),
     default='slurm',
     help='Job launcher')
 @click.option(
@@ -84,7 +84,7 @@ def cli(package: str,
         partition: str,
         cpus_per_task: int = 2,
         max_jobs: int = 1,
-        launcher: str = 'none',
+        launcher: str = 'pytorch',
         port: int = None,
         srun_args: Optional[str] = None,
         search_args: str = '',
@@ -161,7 +161,7 @@ def gridsearch(
     cpus_per_task: int = 2,
     max_jobs: int = 1,
     partition: str = None,
-    launcher: str = 'none',
+    launcher: str = 'pytorch',
     port: int = None,
     srun_args: Optional[str] = None,
     search_args: str = '',
@@ -184,7 +184,7 @@ def gridsearch(
         max_jobs (int, optional): The max number of workers. Applicable only
             if launcher == 'slurm'. Default to 1.
         launcher (str, optional): The launcher used to launch jobs.
-            Defaults to 'none'.
+            Defaults to 'pytorch'.
         port (int | None, optional): The port used for inter-process
             communication (only applicable to slurm / pytorch launchers).
             Default to None. If set to None, will randomly choose a port
@@ -356,16 +356,7 @@ def gridsearch(
 
         common_args = ['--launcher', launcher] + other_args_str.split()
 
-        if launcher == 'none':
-            if gpus:
-                cmd = [
-                    'python', train_script, config_path, '--gpus',
-                    str(gpus)
-                ] + common_args
-            else:
-                cmd = ['python', train_script, config_path, '--device', 'cpu'
-                       ] + common_args
-        elif launcher == 'pytorch':
+        if launcher == 'pytorch':
             if port is None:
                 port = rd.randint(20000, 30000)
 
@@ -395,19 +386,18 @@ def gridsearch(
         click.echo(' '.join(cmd))
 
     succeed_list, fail_list = [], []
-    if launcher in ['none', 'pytorch']:
+    if launcher == 'pytorch':
         for cmd, exp_name in zip(cmds, exp_names):
             cmd_text = ' '.join(cmd)
             click.echo(f'Training command for exp {exp_name} is {cmd_text}. ')
 
-            ret = subprocess.check_call(
-                cmd, env=dict(os.environ, MASTER_PORT=str(port)))
-            if ret == 0:
-                click.echo(f'Exp {exp_name} finished successfully.')
-                succeed_list.append(exp_name)
-            else:
-                echo_error('Training not finished successfully.')
-                fail_list.append(exp_name)
+            # run a bash file
+            lines = ['#!/usr/bin/env bash']
+            lines.append(' '.join(cmd))
+            with open('tmp.sh', 'w') as fout:
+                fout.write('\n'.join(lines))
+
+            os.system('bash tmp.sh')
 
     elif launcher == 'slurm':
         if port is not None:
