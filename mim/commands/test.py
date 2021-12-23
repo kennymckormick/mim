@@ -3,6 +3,7 @@ import os.path as osp
 import random as rd
 import subprocess
 import time
+import numpy as np
 from typing import Optional, Tuple, Union
 
 import click
@@ -249,6 +250,7 @@ def test(
         while usage[0] >= 8 or usage[1] >= 8:
             time.sleep(30)
             usage = get_usage()
+        time.sleep(np.random.rand() * 10)
 
     cmd_text = ' '.join(cmd)
     click.echo(f'Testing command is {cmd_text}. ')

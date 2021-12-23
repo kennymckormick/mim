@@ -422,7 +422,7 @@ def gridsearch(
                     usage = get_usage()
 
                 os.system(cmd_str)
-                os.system('sleep 5')
+                time.sleep(5)
 
             return True, 'MIM Random Port Slurm GSearch Finished. '
 
