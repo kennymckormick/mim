@@ -415,8 +415,14 @@ def gridsearch(
                 cmd_str = ' '.join(cmd)
                 port = rd.randint(20000, 30000)
                 cmd_str = f'MASTER_PORT={port} ' + cmd_str + ' &'
+
+                usage = get_usage()
+                while usage[0] >= 8 or usage[1] >= 8:
+                    time.sleep(30)
+                    usage = get_usage()
+
                 os.system(cmd_str)
-                os.system('sleep 10')
+                os.system('sleep 5')
 
             return True, 'MIM Random Port Slurm GSearch Finished. '
 

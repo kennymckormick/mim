@@ -20,6 +20,19 @@ from requests.models import Response
 from .default import DEFAULT_URL, MMPACKAGE_PATH, PKG2MODULE, PKG2PROJECT
 
 
+def get_usage():
+    """How many processes / nodes you are using"""
+    ret = subprocess.check_output([
+        'squeue', '-o', '"%.10i %.12P %.100j %.15u %.2t %.10M %.3D %R"'
+    ])
+    ret = ret.decode().split('\n')
+    ret = [x for x in ret if 'duanhaodong' in x and 'mediaf' in x]
+    num_proc = len(ret)
+    nodes = [int(x.split()[-2]) for x in ret]
+    num_nodes = sum(nodes)
+    return num_proc, num_nodes
+    
+
 def parse_url(url: str) -> Tuple[str, str]:
     """Parse username and repo from url.
 

@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import random as rd
 import subprocess
+import time
 from typing import Optional, Tuple, Union
 
 import click
@@ -15,6 +16,7 @@ from mim.utils import (
     is_installed,
     module_full_name,
     recursively_find,
+    get_usage
 )
 
 
@@ -242,6 +244,11 @@ def test(
         cmd += parsed_srun_args
         cmd += ['python', '-u', test_script, config]
         cmd += common_args
+
+        usage = get_usage()
+        while usage[0] >= 8 or usage[1] >= 8:
+            time.sleep(30)
+            usage = get_usage()
 
     cmd_text = ' '.join(cmd)
     click.echo(f'Testing command is {cmd_text}. ')
