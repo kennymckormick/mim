@@ -7,8 +7,9 @@ from .search import get_model_info
 from .test import test
 from .train import train
 from .uninstall import uninstall
+from .mrun import mrun
 
 __all__ = [
     'download', 'install', 'list_package', 'uninstall', 'train', 'test', 'run',
-    'gridsearch', 'download', 'get_model_info'
+    'gridsearch', 'download', 'get_model_info', 'mrun'
 ]
