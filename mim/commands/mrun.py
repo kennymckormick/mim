@@ -82,9 +82,11 @@ def mrun(
             fout.write('\n'.join(cmds))
 
     for bash in bash_names:
-        cmd = ['srun', '-p', partition, f'--gres=gpu:{gpus}', '--ntasks=1', 
-               '--ntasks-per-node=1', f'--cpus-per-task={cpus * gpus}', 
-               '--kill-on-bad-exit=1', '-x', './exclude.txt', 'bash', bash, '&']
+        cmd = (
+            f'srun -p {partition} --gres=gpu:{gpus} --ntasks=1 --ntasks-per-node=1 '
+            f'--cpus-per-task={cpus * gpus} --kill-on-bad-exit=1 -x ./exclude.txt '
+            f'bash {bash} &'
+        )
         os.system(cmd)
     
     return True, 'Training finished successfully. '
