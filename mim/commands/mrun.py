@@ -73,7 +73,7 @@ def mrun(
     timestamp = time.strftime('%y%m%d_%H%M%S', time.localtime())
     bash_names = [f'mrun_{timestamp}_{i}.sh' for i in range(num_procs)]
     for i, proc in enumerate(configs):
-        cmds = ['!/bin/bash']
+        cmds = ['#!/bin/bash']
         for cfg in proc:
             assert osp.exists(cfg), f"G! Config file {cfg} not exists! "
             port = rd.randint(20000, 30000)
