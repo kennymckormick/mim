@@ -417,10 +417,10 @@ def gridsearch(
                 port = rd.randint(20000, 30000)
                 cmd_str = f'MASTER_PORT={port} ' + cmd_str + ' &'
 
-                usage = get_usage()
-                while usage[0] >= 8 or usage[1] >= 8:
-                    time.sleep(30)
-                    usage = get_usage()
+                # usage = get_usage()
+                # while usage[0] >= 8 or usage[1] >= 8:
+                #     time.sleep(30)
+                #     usage = get_usage()
 
                 os.system(cmd_str)
                 time.sleep(5)

@@ -239,10 +239,10 @@ def train(
             f'--cpus-per-task={cpus_per_task}', '--kill-on-bad-exit=1'
         ] + parsed_srun_args + ['python', '-u', train_script, config
                                 ] + common_args
-        usage = get_usage()
-        while usage[0] >= 8 or usage[1] >= 8:
-            time.sleep(30)
-            usage = get_usage()
+        # usage = get_usage()
+        # while usage[0] >= 8 or usage[1] >= 8:
+        #     time.sleep(30)
+        #     usage = get_usage()
         time.sleep(np.random.rand() * 10)
 
     cmd_text = ' '.join(cmd)

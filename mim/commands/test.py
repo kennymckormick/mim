@@ -246,10 +246,10 @@ def test(
         cmd += ['python', '-u', test_script, config]
         cmd += common_args
 
-        usage = get_usage()
-        while usage[0] >= 8 or usage[1] >= 8:
-            time.sleep(30)
-            usage = get_usage()
+        # usage = get_usage()
+        # while usage[0] >= 8 or usage[1] >= 8:
+        #     time.sleep(30)
+        #     usage = get_usage()
         time.sleep(np.random.rand() * 10)
 
     cmd_text = ' '.join(cmd)
