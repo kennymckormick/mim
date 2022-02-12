@@ -71,7 +71,7 @@ def mrun(
         assert len(proc) > 0
 
     timestamp = time.strftime('%y%m%d_%H%M%S', time.localtime())
-    bash_names = [f'mrun_{timestamp}_{i}.sh' for i in range(num_procs)]
+    bash_names = [f'mrun_{timestamp}_{i}_{partition}.sh' for i in range(num_procs)]
     for i, proc in enumerate(configs):
         cmds = ['#!/bin/bash']
         for cfg in proc:
