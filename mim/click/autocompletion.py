@@ -29,4 +29,5 @@ def get_official_package(ctx=None, args=None, incomplete=None):
         'mmedit',
         'mmocr',
         'mmgen',
+        'pyskl',
     ]

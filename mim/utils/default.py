@@ -18,6 +18,7 @@ PKG2PROJECT = {
     'mmdet3d': 'mmdetection3d',
     'mmsegmentation': 'mmsegmentation',
     'mmaction2': 'mmaction2',
+    'pyskl': 'pyskl',
     'mmtrack': 'mmtracking',
     'mmpose': 'mmpose',
     'mmedit': 'mmediting',
