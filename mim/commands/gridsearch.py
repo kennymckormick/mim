@@ -321,16 +321,18 @@ def gridsearch(
         suffix_list = []
 
         for k, v in zip(arg_names, combination):
-            suffix_list.extend([k, str(v)])
+            suffix_list.extend([k.split('.')[-1], str(v)])
             set_config(cur_cfg, k, v)
 
         name_suffix = '/search_' + '_'.join(suffix_list)
         work_dir = work_dir_tmpl + name_suffix
         os.makedirs(work_dir, exist_ok=True)
 
-        config_name = config_tmpl + name_suffix + config_suffix
+        config_name = config_tmpl + config_suffix
         exp_names.append(config_tmpl + name_suffix)
         config_path = osp.join(work_dir, config_name)
+
+        cur_cfg['work_dir'] = work_dir
 
         # This exp has been launched before
         if osp.exists(config_path):
@@ -355,7 +357,7 @@ def gridsearch(
             time.sleep(1)
 
         other_args_dict_ = cp.deepcopy(other_args_dict)
-        other_args_dict_['work-dir'] = [work_dir]
+        # other_args_dict_['work-dir'] = [work_dir]
 
         other_args_str = args2string(other_args_dict_)
 
