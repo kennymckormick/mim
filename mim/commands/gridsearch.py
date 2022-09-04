@@ -38,7 +38,7 @@ from mim.utils import (
     '-l',
     '--launcher',
     type=click.Choice(['pytorch', 'slurm'], case_sensitive=False),
-    default='slurm',
+    default='pytorch',
     help='Job launcher')
 @click.option(
     '--port',
@@ -248,6 +248,10 @@ def gridsearch(
         config = files[0]
 
     train_script = osp.join(pkg_root, 'tools/train.py')
+    if not osp.exists(train_script):
+        # A patch only works for pyskl
+        train_script = train_script.replace('pyskl/pyskl', 'pyskl')
+        assert osp.exists(train_script)
 
     # parsing search_args
     # the search_args looks like:
@@ -313,14 +317,14 @@ def gridsearch(
     arg_values = [search_args_dict[k] for k in arg_names]
 
     for combination in itertools.product(*arg_values):
-        cur_cfg = Config(cp.deepcopy(cfg))
+        cur_cfg = Config(dict(cp.deepcopy(cfg)))
         suffix_list = []
 
         for k, v in zip(arg_names, combination):
             suffix_list.extend([k, str(v)])
             set_config(cur_cfg, k, v)
 
-        name_suffix = '_search_' + '_'.join(suffix_list)
+        name_suffix = '/search_' + '_'.join(suffix_list)
         work_dir = work_dir_tmpl + name_suffix
         os.makedirs(work_dir, exist_ok=True)
 
