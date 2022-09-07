@@ -369,12 +369,11 @@ def gridsearch(
         common_args = ['--launcher', launcher] + other_args_str.split()
 
         if launcher == 'pytorch':
-            if port is None:
-                port = rd.randint(20000, 30000)
-            time.sleep(1)
+            cport = rd.randint(20000, 30000) if port is None else port
+            time.sleep(0.1)
             cmd = [
                 'python', '-m', 'torch.distributed.launch',
-                f'--nproc_per_node={gpus}', f'--master_port={port}',
+                f'--nproc_per_node={gpus}', f'--master_port={cport}',
                 train_script, config_path
             ] + common_args
         elif launcher == 'slurm':
@@ -393,7 +392,7 @@ def gridsearch(
 
         cmds.append(cmd)
 
-    time.sleep(2)
+    time.sleep(1)
     for cmd in cmds:
         click.echo(' '.join(cmd))
 
