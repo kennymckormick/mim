@@ -406,13 +406,17 @@ def gridsearch(
         for i in range(num_bash):
             lines = ['#!/usr/bin/env bash']
             for cmd, exp_name in zip(cmds[i::num_bash], exp_names[i::num_bash]):
-                cmd_text = ' '.join(cmd)
+                my_gpus = list(range(i * gpus, i * gpus + gpus))
+                prefix = f'CUDA_VISIBLE_DEVICES={",".join([str(x) for x in my_gpus])}'
+                cmd_text = ' '.join([prefix] + cmd)
                 click.echo(f'Training command for exp {exp_name} is {cmd_text}. ')
                 lines.append(cmd_text)
 
             with open(f'tmp_{i}.sh', 'w') as fout:
                 fout.write('\n'.join(lines))
-            os.system(f'bash tmp_{i}.sh &')
+
+            if not mj:
+                os.system(f'bash tmp_{i}.sh &')
 
     elif launcher == 'slurm':
         if port is not None:
