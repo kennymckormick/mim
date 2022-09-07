@@ -417,6 +417,13 @@ def gridsearch(
             if not mj:
                 os.system(f'bash tmp_{i}.sh &')
 
+        if mj: 
+            lines = ['#!/usr/bin/env bash']
+            lines.extend([f'bash tmp_{i}.sh &' for i in range(num_bash)])
+            with open('tmp.sh', 'w') as fout:
+                fout.write('\n'.join(lines))
+            os.system('bash tmp.sh')
+
     elif launcher == 'slurm':
         if port is not None:
             with Executor(max_workers=max_jobs) as executor:
