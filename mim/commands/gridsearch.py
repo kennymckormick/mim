@@ -371,7 +371,7 @@ def gridsearch(
         if launcher == 'pytorch':
             if port is None:
                 port = rd.randint(20000, 30000)
-
+            time.sleep(1)
             cmd = [
                 'python', '-m', 'torch.distributed.launch',
                 f'--nproc_per_node={gpus}', f'--master_port={port}',
@@ -393,7 +393,7 @@ def gridsearch(
 
         cmds.append(cmd)
 
-    time.sleep(10)
+    time.sleep(2)
     for cmd in cmds:
         click.echo(' '.join(cmd))
 
