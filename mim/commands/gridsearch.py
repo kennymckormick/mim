@@ -72,6 +72,7 @@ from mim.utils import (
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
 @click.option('-y', '--yes', is_flag=True, help='Don’t ask for confirmation.')
+@click.option('--mj', is_flag=True, help='Multiple Jobs Per Node')
 @click.option(
     '-S',
     '--search-args',
@@ -90,6 +91,7 @@ def cli(package: str,
         srun_args: Optional[str] = None,
         search_args: str = '',
         yes: bool = False,
+        mj: bool = True,
         other_args: tuple = ()) -> None:
     """Perform Hyper-parameter search.
 
@@ -146,6 +148,7 @@ def cli(package: str,
         srun_args=srun_args,
         search_args=search_args,
         yes=yes,
+        mj=mj,
         other_args=other_args)
 
     if is_success:
@@ -167,6 +170,7 @@ def gridsearch(
     srun_args: Optional[str] = None,
     search_args: str = '',
     yes: bool = True,
+    mj: bool = True,
     other_args: tuple = ()
 ) -> Tuple[bool, Union[str, Exception]]:
     """Hyper parameter search with given config.
@@ -195,6 +199,7 @@ def gridsearch(
         search_args (str, optional): Arguments for hyper parameters search, all
             arguments should be in a string. Defaults to None.
         yes (bool): Don’t ask for confirmation. Default: True.
+        mj (bool): Multiple jobs per node, only applicable to launcher == 'pytorch'. Default: True.
         other_args (tuple, optional): Other arguments, will be passed to the
             codebase's training script. Defaults to ().
     """
@@ -394,17 +399,20 @@ def gridsearch(
 
     succeed_list, fail_list = [], []
     if launcher == 'pytorch':
-        for cmd, exp_name in zip(cmds, exp_names):
-            cmd_text = ' '.join(cmd)
-            click.echo(f'Training command for exp {exp_name} is {cmd_text}. ')
+        num_bash = 1
+        if mj:
+            num_bash = 8 // gpus
 
-            # run a bash file
+        for i in range(num_bash):
             lines = ['#!/usr/bin/env bash']
-            lines.append(' '.join(cmd))
-            with open('tmp.sh', 'w') as fout:
-                fout.write('\n'.join(lines))
+            for cmd, exp_name in zip(cmds[i::num_bash], exp_names[i::num_bash]):
+                cmd_text = ' '.join(cmd)
+                click.echo(f'Training command for exp {exp_name} is {cmd_text}. ')
+                lines.append(cmd_text)
 
-            os.system('bash tmp.sh')
+            with open(f'tmp_{i}.sh', 'w') as fout:
+                fout.write('\n'.join(lines))
+            os.system(f'bash tmp_{i}.sh &')
 
     elif launcher == 'slurm':
         if port is not None:
