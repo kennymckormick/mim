@@ -338,6 +338,9 @@ def gridsearch(
         config_path = osp.join(work_dir, config_name)
 
         cur_cfg['work_dir'] = work_dir
+        if cur_cfg.get('resume_from', None):
+            assert 'epoch' in cur_cfg['resume_from']
+            cur_cfg['resume_from'] = cur_cfg['resume_from'].replace('/epoch', name_suffix + '/epoch')
 
         # This exp has been launched before
         if osp.exists(config_path):
