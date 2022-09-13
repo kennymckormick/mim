@@ -418,7 +418,7 @@ def gridsearch(
                 fout.write('\n'.join(lines))
 
             if not mj:
-                os.system(f'bash tmp_{i}.sh &')
+                os.system(f'bash tmp_{i}.sh')
 
         if mj: 
             lines = ['#!/usr/bin/env bash']
