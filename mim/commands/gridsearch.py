@@ -350,14 +350,13 @@ def gridsearch(
                 continue
 
             ckpts = os.listdir(work_dir)
-            ckpts = [x for x in ckpts if 'epoch_' in x and '.pth' in x]
+            ckpts = [x for x in ckpts if 'epoch_' in x and '.pth' in x and 'best' not in x]
 
             if len(ckpts):
                 # resume from the latest ckpt
                 max_epoch = max(
                     [int(x.split('.')[0].split('_')[1]) for x in ckpts])
-                cur_cfg['resume_from'] = osp.join(work_dir,
-                                                  f'epoch_{max_epoch}.pth')
+                cur_cfg['resume_from'] = osp.join(work_dir, f'epoch_{max_epoch}.pth')
 
         with open(config_path, 'w') as fout:
             fout.write(cur_cfg.pretty_text)
