@@ -409,6 +409,10 @@ def gridsearch(
             for cmd, exp_name in zip(cmds[i::num_bash], exp_names[i::num_bash]):
                 my_gpus = list(range(i * gpus, i * gpus + gpus))
                 prefix = f'CUDA_VISIBLE_DEVICES={",".join([str(x) for x in my_gpus])}'
+                
+                if not mj and os.environ.get('CUDA_VISIBLE_DEVICES', None) is not None:
+                    prefix = f'CUDA_VISIBLE_DEVICES={os.environ["CUDA_VISIBLE_DEVICES"]}'
+
                 cmd_text = ' '.join([prefix] + cmd)
                 click.echo(f'Training command for exp {exp_name} is {cmd_text}. ')
                 lines.append(cmd_text)
