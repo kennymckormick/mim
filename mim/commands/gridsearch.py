@@ -261,14 +261,18 @@ def gridsearch(
     # parsing search_args
     # the search_args looks like:
     # "--optimizer.lr 0.001 0.01 0.1 --optimizer.weight_decay 1e-4 1e-3 1e-2"
-    search_args_dict = string2args(search_args)
-    if not len(search_args_dict):
-        msg = 'Should specify at least one arg for searching'
-        raise ValueError(highlighted_error(msg))
+    search_args = search_args.split(';')
+    search_args_dicts = [string2args(search_arg) for search_arg in search_args]
 
-    for k in search_args_dict:
-        if search_args_dict[k] is bool:
-            msg = f'Should specify at least one value for arg {k}'
+    for search_args_dict in search_args_dicts:
+
+        if not len(search_args_dict):
+            msg = 'Should specify at least one arg for searching'
+            raise ValueError(highlighted_error(msg))
+
+        for k in search_args_dict:
+            if search_args_dict[k] is bool:
+                msg = f'Should specify at least one value for arg {k}'
             raise ValueError(highlighted_error(msg))
 
     try:
@@ -278,18 +282,20 @@ def gridsearch(
         raise ImportError(highlighted_error(msg))
 
     cfg = Config.fromfile(config)
-    for arg in search_args_dict:
-        try:
-            arg_value = get_config(cfg, arg)
-            if arg_value is not None and not isinstance(arg_value, str):
-                search_args_dict[arg] = [
-                    eval(x) for x in search_args_dict[arg]
-                ]
-                for val in search_args_dict[arg]:
-                    assert type(val) == type(arg_value)
-        except AssertionError:
-            msg = f'Arg {arg} not in the config file. '
-            raise AssertionError(highlighted_error(msg))
+
+    for search_args_dict in search_args_dicts:
+        for arg in search_args_dict:
+            try:
+                arg_value = get_config(cfg, arg)
+                if arg_value is not None and not isinstance(arg_value, str):
+                    search_args_dict[arg] = [
+                        eval(x) for x in search_args_dict[arg]
+                    ]
+                    for val in search_args_dict[arg]:
+                        assert type(val) == type(arg_value)
+            except AssertionError:
+                msg = f'Arg {arg} not in the config file. '
+                raise AssertionError(highlighted_error(msg))
 
     other_args_dict = string2args(' '.join(other_args))
 
@@ -318,81 +324,83 @@ def gridsearch(
     cmds = []
     exp_names = []
 
-    arg_names = [k for k in search_args_dict]
-    arg_values = [search_args_dict[k] for k in arg_names]
+    for search_args_dict in search_args_dicts:
+        
+        arg_names = [k for k in search_args_dict]
+        arg_values = [search_args_dict[k] for k in arg_names]
 
-    for combination in itertools.product(*arg_values):
-        cur_cfg = Config(dict(cp.deepcopy(cfg)))
-        suffix_list = []
+        for combination in itertools.product(*arg_values):
+            cur_cfg = Config(dict(cp.deepcopy(cfg)))
+            suffix_list = []
 
-        for k, v in zip(arg_names, combination):
-            suffix_list.extend([k.split('.')[-1], str(v)])
-            set_config(cur_cfg, k, v)
+            for k, v in zip(arg_names, combination):
+                suffix_list.extend([k.split('.')[-1], str(v)])
+                set_config(cur_cfg, k, v)
 
-        name_suffix = '/search_' + '_'.join(suffix_list)
-        work_dir = work_dir_tmpl + name_suffix
-        os.makedirs(work_dir, exist_ok=True)
+            name_suffix = '/search_' + '_'.join(suffix_list)
+            work_dir = work_dir_tmpl + name_suffix
+            os.makedirs(work_dir, exist_ok=True)
 
-        config_name = config_tmpl + config_suffix
-        exp_names.append(config_tmpl + name_suffix)
-        config_path = osp.join(work_dir, config_name)
+            config_name = config_tmpl + config_suffix
+            exp_names.append(config_tmpl + name_suffix)
+            config_path = osp.join(work_dir, config_name)
 
-        cur_cfg['work_dir'] = work_dir
-        if cur_cfg.get('resume_from', None):
-            assert 'epoch' in cur_cfg['resume_from']
-            cur_cfg['resume_from'] = cur_cfg['resume_from'].replace('/epoch', name_suffix + '/epoch')
+            cur_cfg['work_dir'] = work_dir
+            if cur_cfg.get('resume_from', None):
+                assert 'epoch' in cur_cfg['resume_from']
+                cur_cfg['resume_from'] = cur_cfg['resume_from'].replace('/epoch', name_suffix + '/epoch')
 
-        # This exp has been launched before
-        if osp.exists(config_path):
-            total_epochs = cur_cfg['total_epochs']
-            # The experiment has finished
-            if osp.exists(osp.join(work_dir, f'epoch_{total_epochs}.pth')):
-                continue
+            # This exp has been launched before
+            if osp.exists(config_path):
+                total_epochs = cur_cfg['total_epochs']
+                # The experiment has finished
+                if osp.exists(osp.join(work_dir, f'epoch_{total_epochs}.pth')):
+                    continue
 
-            ckpts = os.listdir(work_dir)
-            ckpts = [x for x in ckpts if 'epoch_' in x and '.pth' in x and 'best' not in x]
+                ckpts = os.listdir(work_dir)
+                ckpts = [x for x in ckpts if 'epoch_' in x and '.pth' in x and 'best' not in x]
 
-            if len(ckpts):
-                # resume from the latest ckpt
-                max_epoch = max(
-                    [int(x.split('.')[0].split('_')[1]) for x in ckpts])
-                cur_cfg['resume_from'] = osp.join(work_dir, f'epoch_{max_epoch}.pth')
+                if len(ckpts):
+                    # resume from the latest ckpt
+                    max_epoch = max(
+                        [int(x.split('.')[0].split('_')[1]) for x in ckpts])
+                    cur_cfg['resume_from'] = osp.join(work_dir, f'epoch_{max_epoch}.pth')
 
-        with open(config_path, 'w') as fout:
-            fout.write(cur_cfg.pretty_text)
-            fout.flush()
-            time.sleep(1)
+            with open(config_path, 'w') as fout:
+                fout.write(cur_cfg.pretty_text)
+                fout.flush()
+                time.sleep(1)
 
-        other_args_dict_ = cp.deepcopy(other_args_dict)
-        # other_args_dict_['work-dir'] = [work_dir]
+            other_args_dict_ = cp.deepcopy(other_args_dict)
+            # other_args_dict_['work-dir'] = [work_dir]
 
-        other_args_str = args2string(other_args_dict_)
+            other_args_str = args2string(other_args_dict_)
 
-        common_args = ['--launcher', launcher] + other_args_str.split()
+            common_args = ['--launcher', launcher] + other_args_str.split()
 
-        if launcher == 'pytorch':
-            cport = rd.randint(20000, 30000) if port is None else port
-            time.sleep(0.1)
-            cmd = [
-                'python', '-m', 'torch.distributed.launch',
-                f'--nproc_per_node={gpus}', f'--master_port={cport}',
-                train_script, config_path
-            ] + common_args
-        elif launcher == 'slurm':
-            parsed_srun_args = srun_args.split() if srun_args else []
-            has_job_name = any([('--job-name' in x) or ('-J' in x)
-                                for x in parsed_srun_args])
-            if not has_job_name:
-                job_name = osp.splitext(osp.basename(config_path))[0]
-                parsed_srun_args.append(f'--job-name={job_name}_train')
-            cmd = [
-                'srun', '-p', f'{partition}', f'--gres=gpu:{gpus_per_node}',
-                f'--ntasks={gpus}', f'--ntasks-per-node={gpus_per_node}',
-                f'--cpus-per-task={cpus_per_task}', '--kill-on-bad-exit=1'
-            ] + parsed_srun_args + ['python', '-u', train_script, config_path
-                                    ] + common_args
+            if launcher == 'pytorch':
+                cport = rd.randint(20000, 30000) if port is None else port
+                time.sleep(0.1)
+                cmd = [
+                    'python', '-m', 'torch.distributed.launch',
+                    f'--nproc_per_node={gpus}', f'--master_port={cport}',
+                    train_script, config_path
+                ] + common_args
+            elif launcher == 'slurm':
+                parsed_srun_args = srun_args.split() if srun_args else []
+                has_job_name = any([('--job-name' in x) or ('-J' in x)
+                                    for x in parsed_srun_args])
+                if not has_job_name:
+                    job_name = osp.splitext(osp.basename(config_path))[0]
+                    parsed_srun_args.append(f'--job-name={job_name}_train')
+                cmd = [
+                    'srun', '-p', f'{partition}', f'--gres=gpu:{gpus_per_node}',
+                    f'--ntasks={gpus}', f'--ntasks-per-node={gpus_per_node}',
+                    f'--cpus-per-task={cpus_per_task}', '--kill-on-bad-exit=1'
+                ] + parsed_srun_args + ['python', '-u', train_script, config_path
+                                        ] + common_args
 
-        cmds.append(cmd)
+            cmds.append(cmd)
 
     time.sleep(1)
     for cmd in cmds:
