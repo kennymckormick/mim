@@ -273,7 +273,7 @@ def gridsearch(
         for k in search_args_dict:
             if search_args_dict[k] is bool:
                 msg = f'Should specify at least one value for arg {k}'
-            raise ValueError(highlighted_error(msg))
+                raise ValueError(highlighted_error(msg))
 
     try:
         from mmcv import Config
@@ -325,7 +325,7 @@ def gridsearch(
     exp_names = []
 
     for search_args_dict in search_args_dicts:
-        
+
         arg_names = [k for k in search_args_dict]
         arg_values = [search_args_dict[k] for k in arg_names]
 
