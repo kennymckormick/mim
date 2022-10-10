@@ -5,7 +5,7 @@ import os.path as osp
 import random as rd
 import subprocess
 import time
-import datetime
+from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor as Executor
 from typing import Optional, Tuple, Union
 
