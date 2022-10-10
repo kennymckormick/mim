@@ -5,6 +5,7 @@ import os.path as osp
 import random as rd
 import subprocess
 import time
+import datetime
 from concurrent.futures import ProcessPoolExecutor as Executor
 from typing import Optional, Tuple, Union
 
@@ -406,6 +407,7 @@ def gridsearch(
     for cmd in cmds:
         click.echo(' '.join(cmd))
 
+    tstr = datetime.now().strftime('%y%m%d_%H%M%S_%f')
     succeed_list, fail_list = [], []
     if launcher == 'pytorch':
         num_bash = 1
@@ -425,18 +427,18 @@ def gridsearch(
                 click.echo(f'Training command for exp {exp_name} is {cmd_text}. ')
                 lines.append(cmd_text)
 
-            with open(f'tmp_{i}.sh', 'w') as fout:
+            with open(f'tmp_{i}_{tstr}.sh', 'w') as fout:
                 fout.write('\n'.join(lines))
 
             if not mj:
-                os.system(f'bash tmp_{i}.sh')
+                os.system(f'bash tmp_{i}_{tstr}.sh')
 
         if mj: 
             lines = ['#!/usr/bin/env bash']
-            lines.extend([f'bash tmp_{i}.sh &' for i in range(num_bash)])
-            with open('tmp.sh', 'w') as fout:
+            lines.extend([f'bash tmp_{i}_{tstr}.sh &' for i in range(num_bash)])
+            with open(f'tmp_{tstr}.sh', 'w') as fout:
                 fout.write('\n'.join(lines))
-            os.system('bash tmp.sh')
+            os.system(f'bash tmp_{tstr}.sh')
 
     elif launcher == 'slurm':
         if port is not None:
