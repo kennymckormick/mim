@@ -72,7 +72,6 @@ from mim.utils import (
     '-j', '--max-jobs', type=int, help='Max parallel number', default=1)
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
-@click.option('-y', '--yes', is_flag=True, help='Don’t ask for confirmation.')
 @click.option('--mj', is_flag=True, help='Multiple Jobs Per Node')
 @click.option(
     '-S',
@@ -91,7 +90,6 @@ def cli(package: str,
         port: int = None,
         srun_args: Optional[str] = None,
         search_args: str = '',
-        yes: bool = False,
         mj: bool = True,
         other_args: tuple = ()) -> None:
     """Perform Hyper-parameter search.
@@ -148,7 +146,6 @@ def cli(package: str,
         port=port,
         srun_args=srun_args,
         search_args=search_args,
-        yes=yes,
         mj=mj,
         other_args=other_args)
 
@@ -170,7 +167,6 @@ def gridsearch(
     port: int = None,
     srun_args: Optional[str] = None,
     search_args: str = '',
-    yes: bool = True,
     mj: bool = True,
     other_args: tuple = ()
 ) -> Tuple[bool, Union[str, Exception]]:
@@ -199,7 +195,6 @@ def gridsearch(
             used, all arguments should be in a string. Defaults to None.
         search_args (str, optional): Arguments for hyper parameters search, all
             arguments should be in a string. Defaults to None.
-        yes (bool): Don’t ask for confirmation. Default: True.
         mj (bool): Multiple jobs per node, only applicable to launcher == 'pytorch'. Default: True.
         other_args (tuple, optional): Other arguments, will be passed to the
             codebase's training script. Defaults to ().
@@ -219,20 +214,8 @@ def gridsearch(
             raise AssertionError(highlighted_error(msg))
 
     if not is_installed(package):
-        msg = (f'The codebase {package} is not installed, '
-               'do you want to install it? ')
-        if yes or click.confirm(msg):
-            click.echo(f'Installing {package}')
-            cmd = ['mim', 'install', package]
-            ret = subprocess.check_call(cmd)
-            if ret != 0:
-                msg = f'{package} is not successfully installed'
-                raise RuntimeError(highlighted_error(msg))
-            else:
-                click.echo(f'{package} is successfully installed')
-        else:
-            msg = f'You can not train this model without {package} installed.'
-            return False, msg
+        msg = f'You can not train this model without {package} installed.'
+        return False, msg
 
     pkg_root = get_installed_path(package)
 
@@ -299,6 +282,13 @@ def gridsearch(
                 raise AssertionError(highlighted_error(msg))
 
     other_args_dict = string2args(' '.join(other_args))
+
+    # 3 in 1
+    if 'all' in other_args_dict:
+        other_args_dict.pop('all')
+        other_args_dict['validate'] = bool
+        other_args_dict['test-last'] = bool
+        other_args_dict['test-best'] = bool
 
     work_dir = other_args_dict.get('work-dir')
 
