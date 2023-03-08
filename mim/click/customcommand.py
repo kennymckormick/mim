@@ -1,6 +1,8 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import os
 import os.path as osp
 import subprocess
+import sys
 import typing as t
 from gettext import ngettext
 
@@ -16,6 +18,8 @@ from mim.utils import (
     is_installed,
     recursively_find,
 )
+
+PYTHON = sys.executable
 
 
 class CustomCommand(click.Command):
@@ -57,9 +61,9 @@ class CustomCommand(click.Command):
             if repo and repo in repos and is_installed(repo):
                 self.name = 'train' if self.name == 'search' else self.name
                 script = osp.join(
-                    get_installed_path(repo), f'tools/{self.name}.py')
-                ret = subprocess.check_output(
-                    ['python', '-u', script, '--help'])
+                    get_installed_path(repo), '.mim', 'tools',
+                    f'{self.name}.py')
+                ret = subprocess.check_output([PYTHON, '-u', script, '--help'])
                 color_echo(
                     'The help message of corresponding script is: ',
                     color='blue')
@@ -81,7 +85,7 @@ class CustomCommand(click.Command):
             if command:
                 repo_root = get_installed_path(repo)
                 files = recursively_find(
-                    osp.join(repo_root, 'tools'), command + '.py')
+                    osp.join(repo_root, '.mim', 'tools'), command + '.py')
                 if len(files) == 0:
                     exit_with_error(
                         f"The command {command} doesn't exist in codebase "
@@ -91,13 +95,13 @@ class CustomCommand(click.Command):
                         f'Multiple scripts with name {command}.py are in '
                         f'codebase {repo}.')
                 ret = subprocess.check_output(
-                    ['python', '-u', files[0], '--help'])
+                    [PYTHON, '-u', files[0], '--help'])
                 click.echo('=' * 80)
                 click.echo('The help message of corresponding script is: ')
                 click.echo(ret.decode('utf-8'))
             else:
                 repo_root = get_installed_path(repo)
-                tool_root = osp.join(repo_root, 'tools')
+                tool_root = osp.join(repo_root, '.mim', 'tools')
                 walk_list = list(os.walk(tool_root))
 
                 files = []
@@ -105,7 +109,7 @@ class CustomCommand(click.Command):
                     files.extend([osp.join(item[0], x) for x in item[2]])
 
                 files = [x for x in files if x.endswith('.py')]
-                files = [x.split(tool_root + '/')[1] for x in files]
+                files = [x.split(tool_root + os.sep)[1] for x in files]
 
                 if len(files):
                     click.echo('=' * 80)

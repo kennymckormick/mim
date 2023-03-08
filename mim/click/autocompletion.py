@@ -1,16 +1,17 @@
-from mim.utils import read_installation_records
+# Copyright (c) OpenMMLab. All rights reserved.
+from mim.commands.list import list_package
 
 
 def get_installed_package(ctx, args, incomplete):
     pkgs = []
-    for pkg, _, _ in read_installation_records():
+    for pkg, _, _ in list_package():
         pkgs.append(pkg)
     return pkgs
 
 
 def get_downstream_package(ctx, args, incomplete):
     pkgs = []
-    for pkg, _, _ in read_installation_records():
+    for pkg, _, _ in list_package():
         if pkg == 'mmcv' or pkg == 'mmcv-full':
             continue
         pkgs.append(pkg)
@@ -23,11 +24,15 @@ def get_official_package(ctx=None, args=None, incomplete=None):
         'mmdet',
         'mmdet3d',
         'mmseg',
-        'mmaction',
+        'mmaction2',
         'mmtrack',
         'mmpose',
         'mmedit',
         'mmocr',
         'mmgen',
+        'mmselfsup'
+        'mmrotate',
+        'mmflow',
+        'mmyolo',
         'pyskl',
     ]

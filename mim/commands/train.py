@@ -1,7 +1,9 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import os
 import os.path as osp
 import random as rd
 import subprocess
+import sys
 import time
 import numpy as np
 from typing import Optional, Tuple, Union
@@ -19,6 +21,8 @@ from mim.utils import (
     recursively_find,
     get_usage
 )
+
+PYTHON = sys.executable
 
 
 @click.command(
@@ -62,7 +66,7 @@ from mim.utils import (
     help='The partition to use (only applicable to launcher == "slurm")')
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
-@click.option('-y', '--yes', is_flag=True, help='Don’t ask for confirmation.')
+@click.option('-y', '--yes', is_flag=True, help='Don\'t ask for confirmation.')
 @click.argument('other_args', nargs=-1, type=click.UNPROCESSED)
 def cli(package: str,
         config: str,
@@ -150,7 +154,7 @@ def train(
             between 20000 and 30000.
         srun_args (str, optional): Other srun arguments that might be
             used, all arguments should be in a string. Defaults to None.
-        yes (bool): Don’t ask for confirmation. Default: True.
+        yes (bool): Don\'t ask for confirmation. Default: True.
         other_args (tuple, optional): Other arguments, will be passed to the
             codebase's training script. Defaults to ().
     """
@@ -192,7 +196,16 @@ def train(
     pkg_root = get_installed_path(package)
 
     if not osp.exists(config):
-        files = recursively_find(pkg_root, osp.basename(config))
+        # configs is put in pkg/.mim in PR #68
+        config_root = osp.join(pkg_root, '.mim', 'configs')
+        if not osp.exists(config_root):
+            # If not pkg/.mim/config, try to search the whole pkg root.
+            config_root = pkg_root
+
+        # pkg/.mim/configs is a symbolic link to the real config folder,
+        # so we need to follow links.
+        files = recursively_find(
+            pkg_root, osp.basename(config), followlinks=True)
 
         if len(files) == 0:
             msg = (f"The path {config} doesn't exist and we can not find "
@@ -204,25 +217,32 @@ def train(
                 f'config files with same name in codebase {package}: {files}.')
             raise ValueError(highlighted_error(msg))
 
+        # Use realpath instead of the symbolic path in pkg/.mim
+        config_path = osp.realpath(files[0])
         click.echo(
             f"The path {config} doesn't exist but we find the config file "
-            f'in codebase {package}, will use {files[0]} instead.')
-        config = files[0]
+            f'in codebase {package}, will use {config_path} instead.')
+        config = config_path
 
-    train_script = osp.join(pkg_root, 'tools/train.py')
+    # tools will be put in package/.mim in PR #68
+    train_script = osp.join(pkg_root, '.mim', 'tools', 'train.py')
+    if not osp.exists(train_script):
+        train_script = osp.join(pkg_root, 'tools', 'train.py')
 
     common_args = ['--launcher', launcher] + list(other_args)
 
     if launcher == 'none':
-        if gpus:
-            cmd = ['python', train_script, config, '--gpus',
-                   str(gpus)] + common_args
-        else:
-            cmd = ['python', train_script, config, '--device', 'cpu'
-                   ] + common_args
+        cmd = [PYTHON, train_script, config] + common_args
+        help_msg = subprocess.check_output([PYTHON, train_script, '-h'])
+        if '--gpus' in help_msg.decode():
+            # OpenMMLab 1.0 should add the `--gpus` or `--device` flags.
+            if gpus:
+                cmd += ['--gpus', str(gpus)]
+            else:
+                cmd += ['--device', 'cpu']
     elif launcher == 'pytorch':
         cmd = [
-            'python', '-m', 'torch.distributed.launch',
+            PYTHON, '-m', 'torch.distributed.launch',
             f'--nproc_per_node={gpus}', f'--master_port={port}', train_script,
             config
         ] + common_args
@@ -237,7 +257,7 @@ def train(
             'srun', '-p', f'{partition}', f'--gres=gpu:{gpus_per_node}',
             f'--ntasks={gpus}', f'--ntasks-per-node={gpus_per_node}',
             f'--cpus-per-task={cpus_per_task}', '--kill-on-bad-exit=1'
-        ] + parsed_srun_args + ['python', '-u', train_script, config
+        ] + parsed_srun_args + [PYTHON, '-u', train_script, config
                                 ] + common_args
         # usage = get_usage()
         # while usage[0] >= 8 or usage[1] >= 8:

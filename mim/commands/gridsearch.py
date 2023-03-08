@@ -1,9 +1,11 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import copy as cp
 import itertools
 import os
 import os.path as osp
 import random as rd
 import subprocess
+import sys
 import time
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor as Executor
@@ -27,6 +29,8 @@ from mim.utils import (
     string2args,
     get_usage
 )
+
+PYTHON = sys.executable
 
 
 @click.command(
@@ -73,6 +77,7 @@ from mim.utils import (
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
 @click.option('--mj', is_flag=True, help='Multiple Jobs Per Node')
+@click.option('-y', '--yes', is_flag=True, help='Don\'t ask for confirmation.')
 @click.option(
     '-S',
     '--search-args',
@@ -196,6 +201,7 @@ def gridsearch(
         search_args (str, optional): Arguments for hyper parameters search, all
             arguments should be in a string. Defaults to None.
         mj (bool): Multiple jobs per node, only applicable to launcher == 'pytorch'. Default: True.
+        yes (bool): Don\'t ask for confirmation. Default: True.
         other_args (tuple, optional): Other arguments, will be passed to the
             codebase's training script. Defaults to ().
     """
@@ -220,7 +226,16 @@ def gridsearch(
     pkg_root = get_installed_path(package)
 
     if not osp.exists(config):
-        files = recursively_find(pkg_root, osp.basename(config))
+        # configs is put in pkg/.mim in PR #68
+        config_root = osp.join(pkg_root, '.mim', 'configs')
+        if not osp.exists(config_root):
+            # If not pkg/.mim/config, try to search the whole pkg root.
+            config_root = pkg_root
+
+        # pkg/.mim/configs is a symbolic link to the real config folder,
+        # so we need to follow links.
+        files = recursively_find(
+            pkg_root, osp.basename(config), followlinks=True)
 
         if len(files) == 0:
             msg = (f"The path {config} doesn't exist and we can not "
@@ -231,10 +246,13 @@ def gridsearch(
                 f"The path {config} doesn't exist and we find multiple "
                 f'config files with same name in codebase {package}: {files}.')
             raise ValueError(highlighted_error(msg))
+
+        # Use realpath instead of the symbolic path in pkg/.mim
+        config_path = osp.realpath(files[0])
         click.echo(
             f"The path {config} doesn't exist but we find the config file "
-            f'in codebase {package}, will use {files[0]} instead.')
-        config = files[0]
+            f'in codebase {package}, will use {config_path} instead.')
+        config = config_path
 
     train_script = osp.join(pkg_root, 'tools/train.py')
     if not osp.exists(train_script):
@@ -260,10 +278,14 @@ def gridsearch(
                 raise ValueError(highlighted_error(msg))
 
     try:
-        from mmcv import Config
+        from mmengine import Config
     except ImportError:
-        msg = 'Please install mmcv to use the gridsearch command.'
-        raise ImportError(highlighted_error(msg))
+        try:
+            from mmcv import Config
+        except ImportError:
+            raise ImportError(
+                'Please install mmengine to use the gridsearch command: '
+                '`mim install mmengine`.')
 
     cfg = Config.fromfile(config)
 

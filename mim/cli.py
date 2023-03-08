@@ -1,9 +1,12 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import difflib
 import os
 import os.path as osp
 from configparser import ConfigParser
 
 import click
+
+from mim.version import __version__
 
 plugin_folder = os.path.join(os.path.dirname(__file__), 'commands')
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -80,7 +83,7 @@ class MIM(click.MultiCommand):
     expose_value=False,
     help='Read option defaults from the .mimrc file',
     show_default=True)
-@click.version_option()
+@click.version_option(version=__version__)
 def cli():
     """OpenMMLab Command Line Interface.
 

@@ -1,16 +1,22 @@
+# Copyright (c) OpenMMLab. All rights reserved.
+import os
 import os.path as osp
-from pkg_resources import resource_filename
 from typing import List, Optional
 
 import click
 
-from mim.click import OptionEatAll, get_downstream_package, param2lowercase
+from mim.click import (
+    OptionEatAll,
+    argument,
+    get_downstream_package,
+    param2lowercase,
+)
 from mim.commands.search import get_model_info
 from mim.utils import (
     DEFAULT_CACHE_DIR,
-    PKG2MODULE,
     download_from_file,
     echo_success,
+    get_installed_path,
     highlighted_error,
     is_installed,
     split_package_version,
@@ -18,7 +24,7 @@ from mim.utils import (
 
 
 @click.command('download')
-@click.argument(
+@argument(
     'package',
     type=str,
     autocompletion=get_downstream_package,
@@ -28,25 +34,33 @@ from mim.utils import (
     'configs',
     cls=OptionEatAll,
     required=True,
-    help='Config ids to download, such as resnet18_b16x8_cifar10')
+    help='Config ids to download, such as resnet18_8xb16_cifar10')
+@click.option(
+    '--ignore-ssl',
+    'check_certificate',
+    is_flag=True,
+    default=True,
+    help='Ignore ssl certificate check')
 @click.option(
     '--dest', 'dest_root', type=str, help='Destination of saving checkpoints.')
 def cli(package: str,
         configs: List[str],
-        dest_root: Optional[str] = None) -> None:
+        dest_root: Optional[str] = None,
+        check_certificate: bool = True) -> None:
     """Download checkpoints from url and parse configs from package.
 
     \b
     Example:
-        > mim download mmcls --config resnet18_b16x8_cifar10
-        > mim download mmcls --config resnet18_b16x8_cifar10 --dest .
+        > mim download mmcls --config resnet18_8xb16_cifar10
+        > mim download mmcls --config resnet18_8xb16_cifar10 --dest .
     """
-    download(package, configs, dest_root)
+    download(package, configs, dest_root, check_certificate)
 
 
 def download(package: str,
              configs: List[str],
-             dest_root: Optional[str] = None) -> List[str]:
+             dest_root: Optional[str] = None,
+             check_certificate: bool = True) -> List[str]:
     """Download checkpoints from url and parse configs from package.
 
     Args:
@@ -54,11 +68,17 @@ def download(package: str,
         configs (List[str]): List of config ids.
         dest_root (Optional[str]): Destination directory to save checkpoint and
             config. Default: None.
+        check_certificate (bool): Whether to check the ssl certificate.
+            Default: True.
     """
     if dest_root is None:
         dest_root = DEFAULT_CACHE_DIR
 
     dest_root = osp.abspath(dest_root)
+
+    # Create the destination directory if it does not exist.
+    if not osp.exists(dest_root):
+        os.makedirs(dest_root)
 
     package, version = split_package_version(package)
     if version:
@@ -81,7 +101,15 @@ def download(package: str,
             highlighted_error(f'Expected configs: {valid_configs}, but got '
                               f'{invalid_configs}'))
 
-    from mmcv import Config
+    try:
+        from mmengine import Config
+    except ImportError:
+        try:
+            from mmcv import Config
+        except ImportError:
+            raise ImportError(
+                'Please install mmengine to use the download command: '
+                '`mim install mmengine`.')
 
     for config in configs:
         click.echo(f'processing {config}...')
@@ -94,24 +122,33 @@ def download(package: str,
                 echo_success(f'{filename} exists in {dest_root}')
             else:
                 # TODO: check checkpoint hash when all the models are ready.
-                download_from_file(checkpoint_url, checkpoint_path)
+                download_from_file(
+                    checkpoint_url,
+                    checkpoint_path,
+                    check_certificate=check_certificate)
 
                 echo_success(
                     f'Successfully downloaded {filename} to {dest_root}')
 
         config_paths = model_info[config]['config']
         for config_path in config_paths.split(','):
-            module_name = PKG2MODULE.get(package, package)
-            config_path = resource_filename(module_name, config_path)
-            if not osp.exists(config_path):
+            installed_path = get_installed_path(package)
+            # configs will be put in package/.mim in PR #68
+            possible_config_paths = [
+                osp.join(installed_path, '.mim', config_path),
+                osp.join(installed_path, config_path)
+            ]
+            for config_path in possible_config_paths:
+                if osp.exists(config_path):
+                    config_obj = Config.fromfile(config_path)
+                    saved_config_path = osp.join(dest_root, f'{config}.py')
+                    config_obj.dump(saved_config_path)
+                    echo_success(
+                        f'Successfully dumped {config}.py to {dest_root}')
+                    checkpoints.append(filename)
+                    break
+            else:
                 raise ValueError(
                     highlighted_error(f'{config_path} is not found.'))
-
-            config_obj = Config.fromfile(config_path)
-            saved_config_path = osp.join(dest_root, f'{config}.py')
-            config_obj.dump(saved_config_path)
-            echo_success(f'Successfully dumped {config}.py to {dest_root}')
-
-            checkpoints.append(filename)
 
     return checkpoints

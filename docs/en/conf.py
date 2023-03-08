@@ -16,25 +16,26 @@ import sys
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-import sphinx_rtd_theme
+import pytorch_sphinx_theme
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 
 project = 'mim'
 copyright = '2021, openmmlab'
 author = 'MIM Authors'
-version_file = '../mim/version.py'
+version_file = '../../mim/version.py'
 
 
 def get_version():
-    with open(version_file, 'r') as f:
+    with open(version_file) as f:
         exec(compile(f.read(), version_file, 'exec'))
     return locals()['__version__']
 
 
 # The full version, including alpha/beta/rc tags
+version = get_version()
 release = get_version()
 
 # -- General configuration ---------------------------------------------------
@@ -44,9 +45,12 @@ release = get_version()
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinxcontrib.napoleon',
+    'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
-]
+    'sphinx_markdown_tables',
+    'myst_parser',
+    'sphinx_copybutton',
+]  # yapf: disable
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -61,9 +65,26 @@ pygments_style = 'sphinx'
 
 # -- Options for HTML output -------------------------------------------------
 
-html_theme = 'sphinx_rtd_theme'
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_theme = 'pytorch_sphinx_theme'
+html_theme_path = [pytorch_sphinx_theme.get_html_theme_path()]
+
+html_theme_options = {
+    'menu': [
+        {
+            'name': 'GitHub',
+            'url': 'https://github.com/open-mmlab/mim'
+        },
+    ],
+    # Specify the language of shared menu
+    'menu_lang': 'en',
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
+html_static_path = ['_static']
+
+# -- Extension configuration -------------------------------------------------
+# Ignore >>> when copying code
+copybutton_prompt_text = r'>>> |\.\.\. '
+copybutton_prompt_is_regexp = True

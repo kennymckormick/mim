@@ -1,3 +1,5 @@
+# Copyright (c) OpenMMLab. All rights reserved.
+import functools
 import hashlib
 import importlib
 import os
@@ -8,16 +10,18 @@ import subprocess
 import tarfile
 import typing
 from collections import defaultdict
-from distutils.version import LooseVersion
-from pkg_resources import parse_version
-from typing import Any, List, Optional, Tuple, Union
+from email.parser import FeedParser
+from pkg_resources import get_distribution, parse_version
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 import click
 import requests
+from pip._vendor.packaging import version
 from requests.exceptions import InvalidURL, RequestException, Timeout
 from requests.models import Response
 
-from .default import DEFAULT_URL, MMPACKAGE_PATH, PKG2MODULE, PKG2PROJECT
+from .default import PKG2PROJECT
+from .progress_bars import rich_progress_bar
 
 
 def get_usage():
@@ -57,6 +61,56 @@ def parse_url(url: str) -> Tuple[str, str]:
     return username, repo
 
 
+def is_installed(package: str) -> bool:
+    """Check package whether installed.
+
+    Args:
+        package (str): Name of package to be checked.
+    """
+    # refresh the pkg_resources
+    # more datails at https://github.com/pypa/setuptools/issues/373
+    importlib.reload(pkg_resources)
+    try:
+        get_distribution(package)
+        return True
+    except pkg_resources.DistributionNotFound:
+        return False
+
+
+def ensure_installation(func):
+    """A decorator to make sure a package has been installed.
+
+    Before invoking those functions which depend on installed package, the
+    decorator makes sure the package has been installed.
+    """
+
+    @functools.wraps(func)
+    def wrapper(package):
+        if not is_installed(package):
+            raise RuntimeError(
+                highlighted_error(f'{package} is not installed.'))
+        return func(package)
+
+    return wrapper
+
+
+@ensure_installation
+def parse_home_page(package: str) -> Optional[str]:
+    """Parse home page from package metadata.
+
+    Args:
+        package (str): Package to parse home page.
+    """
+    home_page = None
+    pkg = get_distribution(package)
+    if pkg.has_metadata('METADATA'):
+        metadata = pkg.get_metadata('METADATA')
+        feed_parser = FeedParser()
+        feed_parser.feed(metadata)
+        home_page = feed_parser.close().get('home-page')
+    return home_page
+
+
 def get_github_url(package: str) -> str:
     """Get github url.
 
@@ -67,31 +121,45 @@ def get_github_url(package: str) -> str:
         >>> get_github_url('mmcls')
         'https://github.com/open-mmlab/mmclassification.git'
     """
-    for _package, _, _url in read_installation_records():
-        if _package == package and _url != 'local':
-            github_url = _url
-            break
+    home_page = None
+    if is_installed(package):
+        home_page = parse_home_page(package)
+
+    if not home_page:
+        try:
+            pkg_info = get_package_info_from_pypi(package)
+            home_page = pkg_info['info'].get('home_page')
+        except Exception:
+            pass
+
+    if home_page:
+        if home_page.endswith('.git'):
+            github_url = home_page
+        elif home_page.endswith('.com'):
+            github_url = home_page.replace('.com', '.git')
+        else:
+            github_url = home_page + '.git'
+        return github_url
     else:
-        if package not in PKG2PROJECT:
-            raise ValueError(
-                highlighted_error(f'Failed to get url of {package}.'))
-
-        github_url = f'{DEFAULT_URL}/{PKG2PROJECT[package]}.git'
-
-    return github_url
+        raise ValueError(
+            highlighted_error(f'Failed to get github url of {package}.'))
 
 
 def get_content_from_url(url: str,
                          timeout: int = 15,
-                         stream: bool = False) -> Response:
+                         stream: bool = False,
+                         check_certificate: bool = True) -> Response:
     """Get content from url.
 
     Args:
         url (str): Url for getting content.
         timeout (int): Set the socket timeout. Default: 15.
+        check_certificate (bool): Whether to check the ssl certificate.
+            Default: True.
     """
     try:
-        response = requests.get(url, timeout=timeout, stream=stream)
+        response = requests.get(
+            url, timeout=timeout, stream=stream, verify=check_certificate)
     except InvalidURL as err:
         raise highlighted_error(err)  # type: ignore
     except Timeout as err:
@@ -106,7 +174,8 @@ def get_content_from_url(url: str,
 @typing.no_type_check
 def download_from_file(url: str,
                        dest_path: str,
-                       hash_prefix: Optional[str] = None) -> None:
+                       hash_prefix: Optional[str] = None,
+                       check_certificate: bool = True) -> None:
     """Download object at the given URL to a local path.
 
     Args:
@@ -114,21 +183,23 @@ def download_from_file(url: str,
         dest_path (str): Path where object will be saved.
         hash_prefix (string, optional): If not None, the SHA256 downloaded
             file should start with `hash_prefix`. Default: None.
+        check_certificate (bool): Whether to check the ssl certificate.
+            Default: True.
     """
     if hash_prefix is not None:
         sha256 = hashlib.sha256()
 
-    response = get_content_from_url(url, stream=True)
+    response = get_content_from_url(
+        url, stream=True, check_certificate=check_certificate)
     size = int(response.headers.get('content-length'))
     with open(dest_path, 'wb') as fw:
         content_iter = response.iter_content(chunk_size=1024)
-        with click.progressbar(content_iter, length=size / 1024) as chunks:
-            for chunk in chunks:
-                if chunk:
-                    fw.write(chunk)
-                    fw.flush()
-                    if hash_prefix is not None:
-                        sha256.update(chunk)
+        for chunk in rich_progress_bar(content_iter, size=size):
+            if chunk:
+                fw.write(chunk)
+                fw.flush()
+                if hash_prefix is not None:
+                    sha256.update(chunk)
 
     if hash_prefix is not None:
         digest = sha256.hexdigest()
@@ -159,16 +230,6 @@ def split_package_version(package: str) -> Tuple[str, ...]:
         return package, ''
 
 
-def is_installed(package: str) -> Any:
-    """Check package whether installed.
-
-    Args:
-        package (str): Name of package to be checked.
-    """
-    module_name = PKG2MODULE.get(package, package)
-    return importlib.util.find_spec(module_name)  # type: ignore
-
-
 def get_package_version(repo_root: str) -> Tuple[str, str]:
     """Get package and version from local repo.
 
@@ -178,26 +239,33 @@ def get_package_version(repo_root: str) -> Tuple[str, str]:
     for file_name in os.listdir(repo_root):
         version_path = osp.join(repo_root, file_name, 'version.py')
         if osp.exists(version_path):
-            with open(version_path, 'r', encoding='utf-8') as f:
+            with open(version_path, encoding='utf-8') as f:
                 exec(compile(f.read(), version_path, 'exec'))
             return file_name, locals()['__version__']
 
     return '', ''
 
 
+@ensure_installation
 def get_installed_version(package: str) -> str:
     """Get the version of package from local environment.
 
     Args:
         package (str): Name of package.
     """
-    module_name = PKG2MODULE.get(package, package)
+    return get_distribution(package).version
 
-    if not is_installed(module_name):
-        raise RuntimeError(highlighted_error(f'{package} is not installed.'))
 
-    module = importlib.import_module(module_name)
-    return module.__version__  # type: ignore
+def get_package_info_from_pypi(package: str, timeout: int = 15) -> dict:
+    """Get package information from pypi.
+
+    Args:
+        package (str): Package to get information.
+        timeout (int): Set the socket timeout. Default: 15.
+    """
+    pkg_url = f'https://pypi.org/pypi/{package}/json'
+    response = get_content_from_url(pkg_url, timeout)
+    return response.json()
 
 
 def get_release_version(package: str, timeout: int = 15) -> List[str]:
@@ -209,10 +277,8 @@ def get_release_version(package: str, timeout: int = 15) -> List[str]:
         package (str): Package to get version.
         timeout (int): Set the socket timeout. Default: 15.
     """
-    pkg_url = f'https://pypi.org/pypi/{package}/json'
-    response = get_content_from_url(pkg_url, timeout)
-    content = response.json()
-    releases = content['releases']
+    pkg_info = get_package_info_from_pypi(package, timeout)
+    releases = pkg_info['releases']
     return sorted(releases, key=parse_version)
 
 
@@ -232,9 +298,26 @@ def get_latest_version(package: str, timeout: int = 15) -> str:
 
 
 def is_version_equal(version1: str, version2: str) -> bool:
-    return LooseVersion(version1) == LooseVersion(version2)
+    return version.parse(version1) == version.parse(version2)
 
 
+@ensure_installation
+def package2module(package: str):
+    """Infer module name from package.
+
+    Args:
+        package (str): Package to infer module name.
+    """
+    pkg = get_distribution(package)
+    if pkg.has_metadata('top_level.txt'):
+        module_name = pkg.get_metadata('top_level.txt').split('\n')[0]
+        return module_name
+    else:
+        raise ValueError(
+            highlighted_error(f'can not infer the module name of {package}'))
+
+
+@ensure_installation
 def get_installed_path(package: str) -> str:
     """Get installed path of package.
 
@@ -245,9 +328,16 @@ def get_installed_path(package: str) -> str:
         >>> get_installed_path('mmcls')
         >>> '.../lib/python3.7/site-packages/mmcls'
     """
-    module_name = PKG2MODULE.get(package, package)
-    module = importlib.import_module(module_name)
-    return module.__path__[0]  # type: ignore
+    # if the package name is not the same as module name, module name should be
+    # inferred. For example, mmcv-full is the package name, but mmcv is module
+    # name. If we want to get the installed path of mmcv-full, we should concat
+    # the pkg.location and module name
+    pkg = get_distribution(package)
+    possible_path = osp.join(pkg.location, package)
+    if osp.exists(possible_path):
+        return possible_path
+    else:
+        return osp.join(pkg.location, package2module(package))
 
 
 def get_torch_cuda_version() -> Tuple[str, str]:
@@ -266,64 +356,12 @@ def get_torch_cuda_version() -> Tuple[str, str]:
     if '+' in torch_v:  # 1.8.1+cu111 -> 1.8.1
         torch_v = torch_v.split('+')[0]
 
-    if torch.cuda.is_available():
+    if torch.version.cuda is not None:
         # torch.version.cuda like 10.2 -> 102
         cuda_v = ''.join(torch.version.cuda.split('.'))
     else:
         cuda_v = 'cpu'
     return torch_v, cuda_v
-
-
-def read_installation_records() -> list:
-    """Read installed packages from mmpackage.txt."""
-    if not osp.isfile(MMPACKAGE_PATH):
-        return []
-
-    seen = set()
-    pkgs_info = []
-    with open(MMPACKAGE_PATH, 'r') as fr:
-        for line in fr:
-            line = line.strip()
-            package, version, source = line.split(',')
-            if not is_installed(package):
-                continue
-
-            pkgs_info.append((package, version, source))
-            seen.add(package)
-
-    # handle two cases
-    # 1. install mmrepos by other ways not mim, such as pip install mmcls
-    # 2. existed mmrepos
-    for pkg in pkg_resources.working_set:
-        pkg_name = pkg.project_name
-        if pkg_name not in seen and (pkg_name in PKG2PROJECT
-                                     or pkg_name in PKG2MODULE):
-            pkgs_info.append((pkg_name, pkg.version, ''))
-
-    return pkgs_info
-
-
-def write_installation_records(package: str,
-                               version: str,
-                               source: str = '') -> None:
-    """Write installed package to mmpackage.txt."""
-    pkgs_info = read_installation_records()
-    with open(MMPACKAGE_PATH, 'w') as fw:
-        if pkgs_info:
-            for _package, _version, _source in pkgs_info:
-                if _package != package:
-                    fw.write(f'{_package},{_version},{_source}\n')
-        fw.write(f'{package},{version},{source}\n')
-
-
-def remove_installation_records(package: str) -> None:
-    """Remove package from mmpackage.txt."""
-    pkgs_info = read_installation_records()
-    if not pkgs_info:
-        with open(MMPACKAGE_PATH, 'w') as fw:
-            for _package, _version, _source in pkgs_info:
-                if _package != package:
-                    fw.write(f'{_package},{_version},{_source}\n')
 
 
 def cast2lowercase(input: Union[list, tuple, str]) -> Any:
@@ -353,22 +391,21 @@ def cast2lowercase(input: Union[list, tuple, str]) -> Any:
         return outputs
 
 
-def recursively_find(root: str, base_name: str) -> list:
+def recursively_find(root: str, base_name: str, followlinks=False) -> list:
     """Recursive list a directory, return all files with a given base_name.
 
     Args:
         root (str): The root directory to list.
         base_name (str): The base_name.
+        followlinks (bool): Follow symbolic links. Defaults to False.
 
     Return:
         Files with given base_name.
     """
-    results = list(os.walk(root))
     files = []
-    for tup in results:
-        root = tup[0]
-        if base_name in tup[2]:
-            files.append(osp.join(root, base_name))
+    for _root, _, _files in os.walk(root, followlinks=followlinks):
+        if base_name in _files:
+            files.append(osp.join(_root, base_name))
 
     return files
 
@@ -485,8 +522,11 @@ def get_config(cfg, name):
     name = name.split('.')
     suffix = ''
     for item in name:
-        assert item in cfg, f'attribute {item} not cfg{suffix}'
-        cfg = cfg[item]
+        if isinstance(cfg, Sequence) and not isinstance(cfg, str):
+            cfg = cfg[int(item)]
+        else:
+            assert item in cfg, f'attribute {item} not cfg{suffix}'
+            cfg = cfg[item]
         suffix += f'.{item}'
     return cfg
 
@@ -500,8 +540,11 @@ def set_config(cfg, name, value):
     name = name.split('.')
     suffix = ''
     for item in name[:-1]:
-        assert item in cfg, f'attribute {item} not cfg{suffix}'
-        cfg = cfg[item]
+        if isinstance(cfg, Sequence) and not isinstance(cfg, str):
+            cfg = cfg[int(item)]
+        else:
+            assert item in cfg, f'attribute {item} not cfg{suffix}'
+            cfg = cfg[item]
         suffix += f'.{item}'
 
     assert name[-1] in cfg, f'attribute {item} not cfg{suffix}'
@@ -532,12 +575,9 @@ def module_full_name(abbr: str) -> str:
         str: The full name of the corresponding module. If abbr is the
             sub-string of zero / multiple module names, return empty string.
     """
-    supported_pkgs = [
-        PKG2MODULE[k] if k in PKG2MODULE else k for k in PKG2PROJECT
-    ]
-    supported_pkgs = list(set(supported_pkgs))
-    names = [x for x in supported_pkgs if abbr in x]
+    names = [x for x in PKG2PROJECT if abbr in x]
     if len(names) == 1:
         return names[0]
-    else:
-        return abbr if abbr in names else ''
+    elif abbr in names or is_installed(abbr):
+        return abbr
+    return ''

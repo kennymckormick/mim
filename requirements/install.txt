@@ -1,6 +1,8 @@
-Click==7.1.2
+Click
 colorama
 model-index
 pandas
+pip>=19.3
 requests
+rich
 tabulate

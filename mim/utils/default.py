@@ -1,9 +1,11 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import os
 import os.path as osp
-import pkg_resources
 
 USER = 'open-mmlab'
 DEFAULT_URL = f'https://github.com/{USER}'
+
+DEFAULT_MMCV_BASE_URL = 'https://download.openmmlab.com'
 
 WHEEL_URL = {
     'mmcv-full':
@@ -24,6 +26,10 @@ PKG2PROJECT = {
     'mmedit': 'mmediting',
     'mmocr': 'mmocr',
     'mmgen': 'mmgeneration',
+    'mmselfsup': 'mmselfsup',
+    'mmrotate': 'mmrotate',
+    'mmflow': 'mmflow',
+    'mmyolo': 'mmyolo',
 }
 # TODO: Should directly infer MODULE name from PKG info
 PKG2MODULE = {
@@ -40,9 +46,3 @@ HOME = osp.expanduser('~')
 DEFAULT_CACHE_DIR = osp.join(HOME, '.cache', 'mim')
 if not osp.exists(DEFAULT_CACHE_DIR):
     os.makedirs(DEFAULT_CACHE_DIR)
-
-# Although site.getsitepackage() can also get the directory of site-packages,
-# it will faild in virtualenv. It is an issue with virtualenv, which copies
-# the bundled version of site.py to the venv when it is created.
-MMPACKAGE_PATH = osp.join(
-    pkg_resources.get_distribution('click').location, 'mmpackage.txt')

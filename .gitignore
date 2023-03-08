@@ -72,7 +72,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+docs/en/_build/
 
 # PyBuilder
 .pybuilder/
@@ -142,3 +142,8 @@ cython_debug/
 
 data/
 *ipynb
+
+src/
+
+# vscode
+.vscode
