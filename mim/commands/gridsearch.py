@@ -77,7 +77,6 @@ PYTHON = sys.executable
 @click.option(
     '--srun-args', type=str, help='Other srun arguments that might be used')
 @click.option('--mj', is_flag=True, help='Multiple Jobs Per Node')
-@click.option('-y', '--yes', is_flag=True, help='Don\'t ask for confirmation.')
 @click.option(
     '-S',
     '--search-args',
@@ -201,7 +200,6 @@ def gridsearch(
         search_args (str, optional): Arguments for hyper parameters search, all
             arguments should be in a string. Defaults to None.
         mj (bool): Multiple jobs per node, only applicable to launcher == 'pytorch'. Default: True.
-        yes (bool): Don\'t ask for confirmation. Default: True.
         other_args (tuple, optional): Other arguments, will be passed to the
             codebase's training script. Defaults to ().
     """
