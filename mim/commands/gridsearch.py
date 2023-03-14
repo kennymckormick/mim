@@ -417,7 +417,7 @@ def gridsearch(
     for cmd in cmds:
         click.echo(' '.join(cmd))
 
-    tstr = datetime.now().strftime('%y%m%d_%H%M%S_%f')
+    tstr = datetime.now().strftime('%H%M%S_%f')[:-4]
     succeed_list, fail_list = [], []
     if launcher == 'pytorch':
         num_bash = 1
